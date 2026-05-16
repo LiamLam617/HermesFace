@@ -17,7 +17,6 @@ import time
 import threading
 import subprocess
 import signal
-import json
 import shutil
 import tempfile
 import traceback
@@ -126,8 +125,8 @@ class HermesFullSync:
         except Exception:
             if not AUTO_CREATE_DATASET:
                 print(f"[SYNC] Dataset repo NOT found: {HF_REPO_ID}")
-                print(f"[SYNC]   Set AUTO_CREATE_DATASET=true to auto-create.")
-                print(f"[SYNC] Persistence disabled (app will still run normally).")
+                print("[SYNC]   Set AUTO_CREATE_DATASET=true to auto-create.")
+                print("[SYNC] Persistence disabled (app will still run normally).")
                 return False
             print(f"[SYNC] Dataset repo NOT found: {HF_REPO_ID} — creating...")
             try:
@@ -423,7 +422,7 @@ class HermesFullSync:
 
         hermes_bin = shutil.which("hermes") or str(APP_DIR / ".venv" / "bin" / "hermes")
         if not Path(hermes_bin).exists():
-            print(f"[SYNC] ERROR: hermes CLI not found")
+            print("[SYNC] ERROR: hermes CLI not found")
             return None
 
         env = os.environ.copy()
@@ -441,7 +440,7 @@ class HermesFullSync:
         # container and Repository Secrets are never exposed to the browser.
         dashboard_cmd = [hermes_bin, "dashboard", "--host", "0.0.0.0", "--port", "7860",
                          "--no-open", "--insecure"]
-        print(f"[SYNC] Starting web dashboard on port 7860...")
+        print("[SYNC] Starting web dashboard on port 7860...")
         dashboard_proc = self._start_process(
             dashboard_cmd, "Dashboard", env, log_dir / "dashboard.log"
         )
@@ -451,7 +450,7 @@ class HermesFullSync:
         gateway_env = env.copy()
         gateway_env["GATEWAY_ALLOW_ALL_USERS"] = "true"
         gateway_cmd = [hermes_bin, "gateway"]
-        print(f"[SYNC] Starting gateway (messaging platforms)...")
+        print("[SYNC] Starting gateway (messaging platforms)...")
         self.gateway_proc = self._start_process(
             gateway_cmd, "Gateway", gateway_env, log_dir / "gateway.log"
         )
