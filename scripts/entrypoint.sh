@@ -1,6 +1,28 @@
 #!/bin/bash
 set -e
 
+# ── 初始化 /opt/data 目錄權限（Storage Bucket mount 後為 root 擁有）──
+# gosu 以 root 身份執行，確保目錄建立後轉交給 hermes user
+if [ "$(id -u)" = "0" ]; then
+    echo "[entrypoint] Running as root, fixing /opt/data permissions..."
+    mkdir -p /opt/data/9router-data \
+             /opt/data/scripts \
+             /opt/data/cron \
+             /opt/data/sessions \
+             /opt/data/logs \
+             /opt/data/hooks \
+             /opt/data/memories \
+             /opt/data/skills \
+             /opt/data/skins \
+             /opt/data/plans \
+             /opt/data/workspace \
+             /opt/data/home
+    chown -R hermes:hermes /opt/data
+    echo "[entrypoint] /opt/data permissions fixed"
+    # 切換到 hermes user 繼續執行
+    exec gosu hermes "$0" "$@"
+fi
+
 # ── 啟動 9Router（背景進程）────────────────────────────────────────────
 echo "[entrypoint] Starting 9Router on port 20128..."
 
