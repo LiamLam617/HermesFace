@@ -2,26 +2,43 @@
 # Builds Hermes Agent from source since no pre-built Docker image is published
 # Rebuild 2026-04-13: initial release
 
-# ── Stage 1: Build Hermes Agent from source ──────────────────────────────
+# ── Stage 1: Build 9Router ────────────────────────────────────────────────
+FROM node:22-alpine AS ninerouter_builder
+WORKDIR /app
+RUN apk --no-cache upgrade && apk --no-cache add python3 make g++ linux-headers
+RUN git clone --depth 1 https://github.com/decolua/9router.git /app
+RUN npm install
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN npm run build
+
+# ── Stage 2: Build Hermes Agent from source ───────────────────────────────
 FROM ghcr.io/astral-sh/uv:0.11.6-python3.13-trixie AS uv_source
 FROM tianon/gosu:1.19-trixie AS gosu_source
 
 FROM debian:13.4
 SHELL ["/bin/bash", "-c"]
-
 ENV PYTHONUNBUFFERED=1
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/hermes/.playwright
 
-# ── System dependencies ──────────────────────────────────────────────────
+# ── System dependencies ───────────────────────────────────────────────────
 RUN echo "[build] Installing system deps..." && START=$(date +%s) \
-  && apt-get update \
-  && apt-get install -y --no-install-recommends \
-     build-essential nodejs npm python3 python3-pip python3-venv \
-     ripgrep ffmpeg gcc python3-dev libffi-dev procps \
-     git ca-certificates curl \
-  && rm -rf /var/lib/apt/lists/* \
-  && pip3 install --no-cache-dir --break-system-packages huggingface_hub requests pyyaml \
-  && echo "[build] System deps: $(($(date +%s) - START))s"
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential nodejs npm python3 python3-pip python3-venv \
+        ripgrep ffmpeg gcc python3-dev libffi-dev procps \
+        git ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip3 install --no-cache-dir --break-system-packages huggingface_hub requests pyyaml \
+    && echo "[build] System deps: $(($(date +%s) - START))s"
+
+# ── 複製 9Router 建置產物 ───────────────────────────────────────────────
+COPY --from=ninerouter_builder /app/public         /opt/9router/public
+COPY --from=ninerouter_builder /app/.next/static   /opt/9router/.next/static
+COPY --from=ninerouter_builder /app/.next/standalone /opt/9router/
+COPY --from=ninerouter_builder /app/open-sse       /opt/9router/open-sse
+COPY --from=ninerouter_builder /app/src/mitm       /opt/9router/src/mitm
+COPY --from=ninerouter_builder /app/node_modules/node-forge /opt/9router/node_modules/node-forge
+COPY --from=ninerouter_builder /app/node_modules/next /opt/9router/node_modules/next
 
 # ── Non-root user ────────────────────────────────────────────────────────
 RUN useradd -u 10000 -m -d /opt/data hermes
