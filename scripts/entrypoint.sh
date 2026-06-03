@@ -1,3 +1,31 @@
+# ── 啟動 9Router（背景進程）────────────────────────────────────────────
+echo "[entrypoint] Starting 9Router on port 20128..."
+
+export NINEROUTER_DATA_DIR="/opt/data/9router-data"
+mkdir -p "$NINEROUTER_DATA_DIR"
+
+PORT=20128 \
+HOSTNAME=0.0.0.0 \
+NODE_ENV=production \
+NEXT_PUBLIC_BASE_URL=http://localhost:20128 \
+DATA_DIR="$NINEROUTER_DATA_DIR" \
+JWT_SECRET="${NINEROUTER_JWT_SECRET}" \
+INITIAL_PASSWORD="${NINEROUTER_PASSWORD}" \
+REQUIRE_API_KEY=true \
+AUTH_COOKIE_SECURE=false \
+node /opt/9router/server.js &
+
+NINEROUTER_PID=$!
+echo "[entrypoint] 9Router PID: $NINEROUTER_PID"
+
+# 等待 9Router 就緒（最多 30 秒）
+for i in $(seq 1 30); do
+    if curl -sf http://localhost:20128/api/health > /dev/null 2>&1; then
+        echo "[entrypoint] 9Router ready after ${i}s"
+        break
+    fi
+    sleep 1
+done
 #!/bin/bash
 set -e
 
