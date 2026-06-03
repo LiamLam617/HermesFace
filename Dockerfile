@@ -108,5 +108,5 @@ RUN chmod +x /opt/hermes-scripts/scripts/entrypoint.sh \
 ENV HERMES_HOME=/opt/data
 ENV PATH="/opt/hermes/.venv/bin:$PATH"
 WORKDIR /opt/data
-
+USER root
 CMD ["/opt/hermes-scripts/scripts/entrypoint.sh"]
