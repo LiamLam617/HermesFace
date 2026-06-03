@@ -93,6 +93,9 @@ RUN echo "Build: ${CACHE_BUST}"
 COPY --chown=hermes:hermes scripts /opt/hermes-scripts/scripts
 COPY --chown=hermes:hermes assets  /opt/hermes-scripts/assets
 
+RUN find /opt/hermes-scripts/scripts -type f \( -name "*.sh" -o -name "*.py" \) \
+    -exec sed -i 's/\r$//' {} \;
+    
 RUN chmod +x /opt/hermes-scripts/scripts/entrypoint.sh \
     /opt/hermes-scripts/scripts/dns-resolve.py \
     /opt/hermes-scripts/scripts/hermes_persist.py \
