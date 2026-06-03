@@ -90,18 +90,20 @@ USER hermes
 # ── HermesFace scripts (persistence + entrypoint + DNS + assets) ──────
 ARG CACHE_BUST=2026-04-22-v2
 RUN echo "Build: ${CACHE_BUST}"
-COPY --chown=hermes:hermes scripts /opt/data/scripts
-COPY --chown=hermes:hermes assets /opt/data/assets
-RUN chmod +x /opt/data/scripts/entrypoint.sh \
-             /opt/data/scripts/dns-resolve.py \
-             /opt/data/scripts/hermes_persist.py \
-             /opt/data/scripts/save_to_dataset.py \
-             /opt/data/scripts/save_to_dataset_atomic.py \
-             /opt/data/scripts/restore_from_dataset.py \
-             /opt/data/scripts/restore_from_dataset_atomic.py
+COPY --chown=hermes:hermes scripts /opt/hermes-scripts/scripts
+COPY --chown=hermes:hermes assets  /opt/hermes-scripts/assets
+
+RUN chmod +x /opt/hermes-scripts/scripts/entrypoint.sh \
+    /opt/hermes-scripts/scripts/dns-resolve.py \
+    /opt/hermes-scripts/scripts/hermes_persist.py \
+    /opt/hermes-scripts/scripts/save_to_dataset.py \
+    /opt/hermes-scripts/scripts/save_to_dataset_atomic.py \
+    /opt/hermes-scripts/scripts/restore_from_dataset.py \
+    /opt/hermes-scripts/scripts/restore_from_dataset_atomic.py \
+    /opt/hermes-scripts/scripts/sync_hf.py
 
 ENV HERMES_HOME=/opt/data
 ENV PATH="/opt/hermes/.venv/bin:$PATH"
 WORKDIR /opt/data
 
-CMD ["/opt/data/scripts/entrypoint.sh"]
+CMD ["/opt/hermes-scripts/scripts/entrypoint.sh"]
