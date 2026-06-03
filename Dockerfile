@@ -5,7 +5,8 @@
 # ── Stage 1: Build 9Router ────────────────────────────────────────────────
 FROM node:22-alpine AS ninerouter_builder
 WORKDIR /app
-RUN apk --no-cache upgrade && apk --no-cache add python3 make g++ linux-headers
+RUN apk --no-cache add git python3 make g++ linux-headers
+RUN apk --no-cache upgrade && apk --no-cache add git python3 make g++ linux-headers
 RUN git clone --depth 1 https://github.com/decolua/9router.git /app
 RUN npm install
 ENV NEXT_TELEMETRY_DISABLED=1
