@@ -74,6 +74,29 @@ if [ ! -f "$HERMES_HOME/SOUL.md" ] && [ -f "$INSTALL_DIR/docker/SOUL.md" ]; then
   echo "[entrypoint] Created SOUL.md from template"
 fi
 
+# ── 設定 Hermes 使用 9Router ──────────────────────────────────────────
+HERMES_CONFIG="$HERMES_HOME/config.yaml"
+if [ -n "${NINEROUTER_API_KEY}" ]; then
+    echo "[entrypoint] Configuring Hermes to use 9Router..."
+    python3 - <<'EOF'
+import os, yaml
+config_path = os.environ.get("HERMES_HOME", "/opt/data") + "/config.yaml"
+with open(config_path, "r") as f:
+    cfg = yaml.safe_load(f) or {}
+cfg["provider"] = "openai-compatible"
+cfg.setdefault("model", {})["default"] = os.environ.get(
+    "NINEROUTER_DEFAULT_MODEL", "kr/claude-sonnet-4.5"
+)
+cfg["openai_compatible"] = {
+    "base_url": "http://localhost:20128/v1",
+    "api_key": os.environ.get("NINEROUTER_API_KEY", ""),
+}
+with open(config_path, "w") as f:
+    yaml.dump(cfg, f, default_flow_style=False, allow_unicode=True)
+print("[entrypoint] Hermes config updated to use 9Router")
+EOF
+fi
+
 # ── Sync bundled skills ──────────────────────────────────────────────────
 if [ -d "$INSTALL_DIR/skills" ] && [ -f "$INSTALL_DIR/tools/skills_sync.py" ]; then
   python3 "$INSTALL_DIR/tools/skills_sync.py" 2>&1 || echo "[entrypoint] Skills sync skipped"
