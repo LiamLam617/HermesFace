@@ -1,3 +1,6 @@
+#!/bin/bash
+set -e
+
 # ── 啟動 9Router（背景進程）────────────────────────────────────────────
 echo "[entrypoint] Starting 9Router on port 20128..."
 
@@ -26,8 +29,6 @@ for i in $(seq 1 30); do
     fi
     sleep 1
 done
-#!/bin/bash
-set -e
 
 BOOT_START=$(date +%s)
 
