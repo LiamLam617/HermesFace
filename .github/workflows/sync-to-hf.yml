@@ -1,0 +1,17 @@
+name: Sync to Hugging Face Space
+
+on:
+  push:
+    branches: [main]        # 每次 push 到 main 就觸發
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: huggingface/hub-sync@v0.1.0
+        with:
+          github_repo_id: ${{ github.repository }}
+          huggingface_repo_id: Liam0617/my-hermes-agent   # ← 換成你的 HF Space ID
+          hf_token: ${{ secrets.HF_TOKEN }}
