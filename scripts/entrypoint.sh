@@ -23,6 +23,17 @@ if [ "$(id -u)" = "0" ]; then
     exec gosu hermes "$0" "$@"
 fi
 
+# ── 等待 Storage Bucket FUSE 掛載穩定 ──────────────────
+echo "[entrypoint] Waiting for Storage Bucket to stabilize..."
+for i in $(seq 1 10); do
+    if touch /opt/data/.bucket_check 2>/dev/null; then
+        rm -f /opt/data/.bucket_check
+        echo "[entrypoint] Bucket ready after ${i}s"
+        break
+    fi
+    sleep 1
+done
+
 # ── 啟動 9Router（背景進程）────────────────────────────────────────────
 echo "[entrypoint] Starting 9Router on port 20128..."
 
@@ -129,7 +140,11 @@ fi
 
 # ── Sync bundled skills ──────────────────────────────────────────────────
 if [ -d "$INSTALL_DIR/skills" ] && [ -f "$INSTALL_DIR/tools/skills_sync.py" ]; then
-  python3 "$INSTALL_DIR/tools/skills_sync.py" 2>&1 || echo "[entrypoint] Skills sync skipped"
+    echo "[entrypoint] Syncing skills (with FUSE error protection)..."
+    python3 "$INSTALL_DIR/tools/skills_sync.py" 2>&1 || {
+        EXIT_CODE=$?
+        echo "[entrypoint] Skills sync failed (exit $EXIT_CODE), continuing anyway..."
+    }
 fi
 
 # ── Build artifacts check ───────────────────────────────────────────────
@@ -148,4 +163,4 @@ echo "[TIMER] Entrypoint (before sync_hf.py): $((ENTRYPOINT_END - BOOT_START))s"
 
 # ── Start Hermes via sync_hf.py (handles persistence + process management)
 echo "[entrypoint] Starting Hermes Agent via sync_hf.py..."
-exec python3 -u /opt/hermes/.venv/bin/hermes start --config /opt/data/config.yaml
+exec python3 -u /opt/hermes-scripts/scripts/sync_hf.py
