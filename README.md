@@ -6,9 +6,7 @@ colorTo: blue
 sdk: docker
 pinned: false
 license: mit
-datasets:
-  - tao-shen/HermesFace-data
-short_description: Free always-on self-improving AI agent, no hardware required
+short_description: Hermes Agent on Hugging Face Spaces with 9Router and Storage Buckets
 app_port: 7860
 tags:
   - huggingface
@@ -29,7 +27,6 @@ tags:
   - agents
   - multi-channel
   - free-tier
-  - one-click-deploy
   - self-hosted
   - messaging-bot
   - self-improving
@@ -38,174 +35,163 @@ tags:
 <div align="center">
   <img src="HermesFace.png" alt="HermesFace" width="720"/>
   <br/><br/>
-  <strong>Your always-on, self-improving AI agent — free, no server needed</strong>
+  <strong>Your always-on, self-improving AI agent on Hugging Face Spaces</strong>
   <br/>
-  <sub>Telegram · Discord · Slack · WhatsApp · Signal · WeChat · 16+ channels · Self-improving skills · Persistent memory · One-click deploy</sub>
+  <sub>Hermes Agent · 9Router · Storage Bucket persistence · Telegram · Discord · Slack · WhatsApp · 16+ channels</sub>
   <br/><br/>
 
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-  [![Hugging Face](https://img.shields.io/badge/🤗-HF%20Space-yellow)](https://huggingface.co/spaces/tao-shen/HermesFace)
-  [![GitHub](https://img.shields.io/badge/GitHub-Repository-181717?logo=github)](https://github.com/democra-ai/HermesFace)
+  [![Hugging Face](https://img.shields.io/badge/HF%20Space-yellow)](https://huggingface.co/spaces/tao-shen/HermesFace)
   [![Hermes Agent](https://img.shields.io/badge/Hermes_Agent-Powered-blueviolet)](https://github.com/NousResearch/hermes-agent)
+  [![9Router](https://img.shields.io/badge/9Router-LLM%20API-green)](https://github.com/decolua/9router)
   [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker)](https://www.docker.com/)
-  [![OpenAI Compatible](https://img.shields.io/badge/OpenAI--compatible-API-green)](https://github.com/NousResearch/hermes-agent)
-  [![Telegram](https://img.shields.io/badge/Telegram-Enabled-26A5E4?logo=telegram)](https://telegram.org/)
-  [![Discord](https://img.shields.io/badge/Discord-Enabled-5865F2?logo=discord)](https://discord.com/)
-  [![Free Tier](https://img.shields.io/badge/Free%20Tier-16GB%20RAM-brightgreen)](https://huggingface.co/spaces)
 </div>
 
 ---
 
-## What you get
+## What You Get
 
-In about 5 minutes, you'll have a **free, always-on, self-improving AI assistant** connected to Telegram, Discord, Slack, WhatsApp, and 16+ other channels — no server, no subscription, no hardware required.
+HermesFace deploys the latest Hermes Agent source build on Hugging Face Spaces and routes LLM traffic through a local 9Router instance.
 
 | | |
 |---|---|
-| **Free forever** | HuggingFace Spaces gives you 2 vCPU + 16 GB RAM at no cost |
-| **Always online** | Your conversations, skills, memories, and config survive every restart |
-| **16+ channels** | Telegram, Discord, Slack, WhatsApp, Signal, WeChat, iMessage, and more |
-| **Self-improving** | Hermes creates and refines skills from experience during use |
-| **Persistent memory** | LLM-powered memory with search and summarization across sessions |
-| **47 built-in tools** | Terminal, file ops, web search, vision, image generation, browser automation |
-| **Any LLM** | OpenRouter (200+ models, free tier available), OpenAI, Claude, Gemini, Nous Portal |
-| **Web dashboard** | React-based UI for managing config, API keys, and monitoring sessions |
-| **One-click deploy** | Duplicate the Space, set two secrets, done |
-
-> **Powered by [Hermes Agent](https://github.com/NousResearch/hermes-agent)** — Nous Research's open-source, self-improving AI assistant that normally requires your own machine. HermesFace makes it run for free on HuggingFace Spaces by adding data persistence via HF Dataset sync.
-
-## Architecture
-
-<div align="center">
-  <img src="assets/architecture.svg" alt="Architecture" width="720"/>
-</div>
-
----
+| **Persistent state** | Hugging Face Storage Bucket mounted at `/opt/data` keeps conversations, memories, skills, config, and 9Router state across restarts |
+| **9Router LLM API** | Hermes talks to `http://localhost:20128/v1`, so the Space uses 9Router as its OpenAI-compatible provider |
+| **Setup mode** | Temporarily expose the 9Router dashboard on port `7860` to configure providers, combos, and keys |
+| **Agent mode** | Run Hermes dashboard on port `7860` while 9Router stays internal on port `20128` |
+| **Self-improving agent** | Hermes Agent keeps its generated skills, memories, sessions, plans, and workspace under `/opt/data` |
+| **Messaging channels** | Telegram, Discord, Slack, WhatsApp, Signal, WeChat, and more through Hermes gateway support |
 
 ## Quick Start
 
-### 1. Duplicate this Space
+### 1. Duplicate or Create the Space
 
-Click **Duplicate this Space** on the [HermesFace Space page](https://huggingface.co/spaces/tao-shen/HermesFace).
+Use Docker SDK and keep `app_port: 7860`. The Space must have a Storage Bucket mounted at `/opt/data`.
 
-> **After duplicating:** edit your Space's `README.md` and update the `datasets:` field in the YAML header to point to your own dataset repo (e.g. `your-name/YourSpace-data`), or remove it entirely. This prevents your Space from appearing as linked to the original dataset.
+### 2. Attach Storage Bucket
 
-### 2. Set Secrets
+In the Space settings, add a Storage Bucket and mount it at:
 
-Go to **Settings → Repository secrets** and add the following. The only two you *must* set are `HF_TOKEN` and one API key.
+```text
+/opt/data
+```
 
-| Secret | Status | Description | Example |
-|--------|:------:|-------------|---------|
-| `HF_TOKEN` | **Required** | HF Access Token with write permission ([create one](https://huggingface.co/settings/tokens)) | `hf_AbCdEfGhIjKlMnOpQrStUvWxYz` |
-| `AUTO_CREATE_DATASET` | **Recommended** | Set to `true` — HermesFace will automatically create a private backup dataset on first startup. No manual setup needed. | `true` |
-| `OPENROUTER_API_KEY` | Recommended | [OpenRouter](https://openrouter.ai) API key — 200+ models, free tier available. Easiest way to get started. | `sk-or-v1-xxxxxxxxxxxx` |
-| `OPENAI_API_KEY` | Optional | OpenAI API key | `sk-proj-xxxxxxxxxxxx` |
-| `ANTHROPIC_API_KEY` | Optional | Anthropic Claude API key | `sk-ant-xxxxxxxxxxxx` |
-| `NOUS_API_KEY` | Optional | Nous Portal API key | `nous-xxxxxxxxxxxx` |
-| `GOOGLE_API_KEY` | Optional | Google / Gemini API key | `AIzaSyXxXxXxXxXx` |
+This is the only persistence layer HermesFace uses by default.
 
-### Data Persistence
+### 3. Configure 9Router
 
-HermesFace syncs `/opt/data` (conversations, skills, memories, config) to a private HuggingFace Dataset repo so your data survives every restart.
+Set these Repository Secrets:
 
-**Option A — Auto mode (recommended)**
+| Secret | Value |
+|---|---|
+| `HERMESFACE_MODE` | `ninerouter-setup` |
+| `NINEROUTER_PASSWORD` | A strong password for the setup dashboard |
+| `NINEROUTER_JWT_SECRET` | A long random string |
 
-1. Set `AUTO_CREATE_DATASET` = `true` in your Space secrets
-2. Set `HF_TOKEN` with write permission
-3. Done — on first startup, HermesFace automatically creates a private Dataset repo named `your-username/SpaceName-data`. Each duplicated Space gets its own isolated dataset.
+Restart the Space and open the Space URL. It will show the 9Router dashboard on port `7860`.
 
-**Option B — Manual mode**
+Use 9Router to configure your provider, Kiro/OpenCode connection, models, combos, and API keys. 9Router stores its state in:
 
-1. Go to [huggingface.co/new-dataset](https://huggingface.co/new-dataset) and create a **private** Dataset repo (e.g. `your-name/HermesFace-data`)
-2. Set `HERMES_DATASET_REPO` = `your-name/HermesFace-data` in your Space secrets
-3. Set `HF_TOKEN` with write permission
-4. Done — HermesFace will sync to this repo every 60 seconds
+```text
+/opt/data/9router-data/db/data.sqlite
+```
 
-### Environment Variables
+### 4. Start Hermes Agent
 
-Fine-tune persistence and performance. Set these as **Repository Secrets** in HF Spaces, or in `.env` for local Docker.
+After 9Router is configured, change the Repository Secret:
+
+```text
+HERMESFACE_MODE=agent
+```
+
+Restart the Space. HermesFace will:
+
+1. Start 9Router internally on `http://localhost:20128`.
+2. Write Hermes `/opt/data/config.yaml` with:
+
+```yaml
+model:
+  provider: custom
+  default: kr/claude-sonnet-4.5
+  base_url: http://localhost:20128/v1
+  api_key: sk-local
+```
+
+3. Start the Hermes dashboard on port `7860`.
+4. Start the Hermes gateway for messaging integrations.
+
+If you want 9Router API-key enforcement in agent mode, generate a 9Router key during setup and set:
+
+```text
+NINEROUTER_API_KEY=<generated-9router-key>
+```
+
+If `NINEROUTER_API_KEY` is left as `sk-local`, the internal 9Router endpoint starts with local-only access and no API-key requirement.
+
+## Environment Variables
 
 | Variable | Default | Description |
-|----------|---------|-------------|
-| `AUTO_CREATE_DATASET` | `true` | Auto-create the Dataset repo on first startup |
-| `SYNC_INTERVAL` | `60` | Backup interval in seconds |
-| `AGENT_NAME` | `HermesFace` | Agent display name in messaging platforms |
+|---|---|---|
+| `HERMESFACE_MODE` | `agent` | `agent` starts Hermes + internal 9Router; `ninerouter-setup` exposes only 9Router on `7860` |
+| `NINEROUTER_PASSWORD` | empty | Password for 9Router setup mode |
+| `NINEROUTER_JWT_SECRET` | `hermesface-change-me` | Session signing secret for 9Router |
+| `NINEROUTER_DEFAULT_MODEL` | `kr/claude-sonnet-4.5` | Hermes default model name routed through 9Router |
+| `NINEROUTER_API_KEY` | `sk-local` | API key Hermes sends to 9Router; `sk-local` disables internal API-key enforcement |
+| `AGENT_NAME` | `HermesFace` | Agent display name |
 | `TZ` | `UTC` | Timezone for logs and scheduled tasks |
 
-> For the full list (including all Hermes Agent variables), see [`.env.example`](.env.example).
+HermesFace still passes the full environment through to Hermes Agent, so messaging tokens and other Hermes-supported variables work as Repository Secrets.
 
-### 3. Open the Dashboard
+## Persistent State Layout
 
-Visit your Space URL. The Hermes Agent web dashboard provides:
-- **Status Page** — agent status and session activity
-- **Config Page** — dynamic configuration editor
-- **Env Page** — API key management
+The Storage Bucket mounted at `/opt/data` contains all durable state:
 
-Messaging integrations (Telegram, Discord, WhatsApp) can be configured through the dashboard or via environment variables.
-
-## Configuration
-
-HermesFace supports **all Hermes Agent environment variables** — it passes the entire environment to the Hermes process (`env=os.environ.copy()`), so any variable from the [Hermes Agent docs](https://github.com/NousResearch/hermes-agent) works out of the box in HF Spaces. This includes:
-
-- **API Keys** — `OPENROUTER_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `NOUS_API_KEY`, `GOOGLE_API_KEY`, `MISTRAL_API_KEY`
-- **Messaging** — `TELEGRAM_BOT_TOKEN`, `DISCORD_BOT_TOKEN`, `SLACK_BOT_TOKEN`
-- **Terminal** — `TERMINAL_BACKEND`, `TERMINAL_TIMEOUT`
-- **Browser** — `BROWSERBASE_API_KEY`, `BROWSERBASE_PROJECT_ID`
-
-HermesFace adds its own variables for persistence and deployment: `HF_TOKEN`, `HERMES_DATASET_REPO`, `AUTO_CREATE_DATASET`, `SYNC_INTERVAL`, etc. See [`.env.example`](.env.example) for the complete reference.
-
-## Connecting Messaging Platforms
-
-Set the appropriate bot token as a Space Secret:
-
-| Platform | Secret | Docs |
-|----------|--------|------|
-| Telegram | `TELEGRAM_BOT_TOKEN` | [BotFather](https://t.me/botfather) |
-| Discord | `DISCORD_BOT_TOKEN` | [Discord Developer Portal](https://discord.com/developers/applications) |
-| Slack | `SLACK_BOT_TOKEN` | [Slack API](https://api.slack.com/apps) |
-| WhatsApp | QR code pairing | Automatic via gateway |
-| Signal | Via linked device | Configure in gateway |
-| WeChat | `WEIXIN_APP_ID` + `WEIXIN_APP_SECRET` | WeChat Open Platform |
+| Path | Purpose |
+|---|---|
+| `/opt/data/9router-data/db/data.sqlite` | 9Router provider, combo, account, and key state |
+| `/opt/data/config.yaml` | Hermes Agent config, including local 9Router provider settings |
+| `/opt/data/SOUL.md` | Hermes Agent identity/persona file |
+| `/opt/data/sessions` | Hermes conversation/session state |
+| `/opt/data/memories` | Hermes long-term memory data |
+| `/opt/data/skills` | Skills created or synced by Hermes |
+| `/opt/data/plans` | In-flight Hermes plans |
+| `/opt/data/workspace` | Files created by Hermes tool use |
+| `/opt/data/logs` | Runner, dashboard, gateway, and runtime logs |
 
 ## Local Docker
 
 ```bash
-git clone https://github.com/democra-ai/HermesFace.git
-cd HermesFace
-cp .env.example .env    # Edit with your API keys
 docker build -t hermesface .
-docker run -p 7860:7860 --env-file .env hermesface
+docker volume create hermesface-data
+
+# 1. Configure 9Router
+docker run --rm -p 7860:7860 \
+  -v hermesface-data:/opt/data \
+  -e HERMESFACE_MODE=ninerouter-setup \
+  -e NINEROUTER_PASSWORD=change-me \
+  -e NINEROUTER_JWT_SECRET=change-this-secret \
+  hermesface
+
+# 2. Run Hermes Agent with the same volume
+docker run --rm -p 7860:7860 \
+  -v hermesface-data:/opt/data \
+  -e HERMESFACE_MODE=agent \
+  hermesface
 ```
 
-## Security
+## Security Notes
 
-- **Environment isolation** — each Space runs in its own Docker container, sandboxed from your local machine. Unlike running Hermes Agent locally (where it has full system privileges), cloud deployment limits the blast radius.
-- **Secrets stay server-side** — API keys and tokens are set as HF Spaces Repository Secrets, never exposed to the browser or the public Dataset.
-- **Private backups** — the Dataset repo is created as private by default.
-- **DNS over HTTPS** — `dns-resolve.py` bypasses HF Spaces' DNS blocks on Telegram / Discord / WhatsApp via Cloudflare + Google DoH, writing `/etc/hosts` (for Python) and `/tmp/dns-resolved.json` (consumed by the Node `dns-fix.cjs` preload).
-
-## Manual backup / restore
-
-For one-off snapshots outside the 60-second sync cycle, use the CLI utilities in `scripts/`:
-
-```bash
-# Full tar.gz snapshot → Dataset repo (keeps last 5, auto-rotates)
-python3 scripts/hermes_persist.py save
-
-# Restore latest snapshot into /opt/data
-python3 scripts/hermes_persist.py load
-
-# Inspect current backups
-python3 scripts/hermes_persist.py status
-```
-
-The atomic variants (`save_to_dataset_atomic.py`, `restore_from_dataset_atomic.py`) use HF commit operations with checksum metadata for file-granular restore — useful when you only want to roll back a single file.
+- Keep `HERMESFACE_MODE=ninerouter-setup` enabled only while configuring 9Router.
+- Set `NINEROUTER_PASSWORD` and `NINEROUTER_JWT_SECRET` before exposing setup mode publicly.
+- In `agent` mode, 9Router listens inside the container on `20128`; Hugging Face exposes only port `7860`.
+- Repository Secrets stay server-side. Do not put provider keys in files committed to the repo.
+- `dns-resolve.py` keeps the existing DNS-over-HTTPS fallback for messaging APIs that are hard to resolve from HF Spaces.
 
 ## Acknowledgments
 
-- **[Hermes Agent](https://github.com/NousResearch/hermes-agent)** by [Nous Research](https://nousresearch.com/) — the self-improving AI assistant framework HermesFace wraps
-- **[HuggingFace Spaces](https://huggingface.co/spaces)** — free Docker hosting for ML apps
-- **[HuggingClaw](https://github.com/tao-shen/HuggingClaw)** — sibling project that pioneered the atomic-tar persistence + DoH DNS escape-hatch patterns HermesFace adopts
+- [Hermes Agent](https://github.com/NousResearch/hermes-agent) by Nous Research.
+- [9Router](https://github.com/decolua/9router) by decolua.
+- [Hugging Face Spaces](https://huggingface.co/spaces) and Storage Buckets.
 
 ## License
 

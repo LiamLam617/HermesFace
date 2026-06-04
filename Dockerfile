@@ -5,9 +5,13 @@
 # ── Stage 1: Build 9Router ────────────────────────────────────────────────
 FROM node:22-alpine AS ninerouter_builder
 WORKDIR /app
+ARG NINEROUTER_REF=master
 RUN apk --no-cache add git python3 make g++ linux-headers
 RUN apk --no-cache upgrade && apk --no-cache add git python3 make g++ linux-headers
-RUN git clone --depth 1 https://github.com/decolua/9router.git /app
+RUN git clone --depth 1 https://github.com/decolua/9router.git /app \
+    && if [ "${NINEROUTER_REF}" != "master" ]; then \
+         git fetch --depth 1 origin "${NINEROUTER_REF}" && git checkout FETCH_HEAD; \
+       fi
 RUN npm install
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
@@ -29,7 +33,7 @@ RUN echo "[build] Installing system deps..." && START=$(date +%s) \
         ripgrep ffmpeg gcc python3-dev libffi-dev procps \
         git ca-certificates curl \
     && rm -rf /var/lib/apt/lists/* \
-    && pip3 install --no-cache-dir --break-system-packages huggingface_hub requests pyyaml \
+    && pip3 install --no-cache-dir --break-system-packages requests pyyaml \
     && echo "[build] System deps: $(($(date +%s) - START))s"
 
 # ── 複製 9Router 建置產物 ───────────────────────────────────────────────
@@ -48,8 +52,13 @@ COPY --chmod=0755 --from=gosu_source /gosu /usr/local/bin/
 COPY --chmod=0755 --from=uv_source /usr/local/bin/uv /usr/local/bin/uvx /usr/local/bin/
 
 # ── Clone and build Hermes Agent ─────────────────────────────────────────
+ARG HERMES_AGENT_REF=main
 RUN echo "[build] Cloning Hermes Agent..." && START=$(date +%s) \
   && git clone --depth 1 https://github.com/NousResearch/hermes-agent.git /opt/hermes \
+  && cd /opt/hermes \
+  && if [ "${HERMES_AGENT_REF}" != "main" ]; then \
+       git fetch --depth 1 origin "${HERMES_AGENT_REF}" && git checkout FETCH_HEAD; \
+     fi \
   && echo "[build] Clone: $(($(date +%s) - START))s"
 
 WORKDIR /opt/hermes
@@ -82,7 +91,7 @@ RUN chmod +x /opt/hermes/docker/entrypoint.sh
 # ── Prepare runtime dirs ────────────────────────────────────────────────
 RUN mkdir -p /opt/data/cron /opt/data/sessions /opt/data/logs /opt/data/hooks \
              /opt/data/memories /opt/data/skills /opt/data/skins /opt/data/plans \
-             /opt/data/workspace /opt/data/home \
+             /opt/data/workspace /opt/data/home /opt/data/9router-data \
   && chown -R hermes:hermes /opt/data
 
 USER hermes
@@ -98,12 +107,7 @@ RUN find /opt/hermes-scripts/scripts -type f \( -name "*.sh" -o -name "*.py" \) 
     
 RUN chmod +x /opt/hermes-scripts/scripts/entrypoint.sh \
     /opt/hermes-scripts/scripts/dns-resolve.py \
-    /opt/hermes-scripts/scripts/hermes_persist.py \
-    /opt/hermes-scripts/scripts/save_to_dataset.py \
-    /opt/hermes-scripts/scripts/save_to_dataset_atomic.py \
-    /opt/hermes-scripts/scripts/restore_from_dataset.py \
-    /opt/hermes-scripts/scripts/restore_from_dataset_atomic.py \
-    /opt/hermes-scripts/scripts/sync_hf.py
+    /opt/hermes-scripts/scripts/run_hermes.py
 
 ENV HERMES_HOME=/opt/data
 ENV PATH="/opt/hermes/.venv/bin:$PATH"
