@@ -163,4 +163,4 @@ echo "[TIMER] Entrypoint (before sync_hf.py): $((ENTRYPOINT_END - BOOT_START))s"
 
 # ── Start Hermes via sync_hf.py (handles persistence + process management)
 echo "[entrypoint] Starting Hermes Agent via sync_hf.py..."
-exec python3 -u /opt/hermes-scripts/scripts/sync_hf.py
+exec /usr/bin/python3 -u /opt/hermes-scripts/scripts/sync_hf.py
