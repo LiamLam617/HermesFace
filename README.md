@@ -6,7 +6,7 @@ colorTo: blue
 sdk: docker
 pinned: false
 license: mit
-short_description:Hermes
+short_description: Hermes
 app_port: 7860
 tags:
   - huggingface
