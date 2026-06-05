@@ -11,7 +11,8 @@ SCRIPTS_SRC="/opt/hermes-scripts/scripts"
 INSTALL_DIR="/opt/hermes"
 
 ensure_data_dirs() {
-    mkdir -p "${NINEROUTER_DATA_DIR}" \
+    mkdir -p "${NINEROUTER_DATA_DIR}/db" \
+             "${NINEROUTER_DATA_DIR}" \
              "${HERMES_HOME}/scripts" \
              "${HERMES_HOME}/cron" \
              "${HERMES_HOME}/sessions" \
