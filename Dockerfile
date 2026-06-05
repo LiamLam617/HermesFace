@@ -3,11 +3,13 @@
 # Rebuild 2026-04-13: initial release
 
 # ── Stage 1: Build 9Router ────────────────────────────────────────────────
-FROM node:22-alpine AS ninerouter_builder
+FROM node:22-bookworm-slim AS ninerouter_builder
 WORKDIR /app
 ARG NINEROUTER_REF=master
-RUN apk --no-cache add git python3 make g++ linux-headers
-RUN apk --no-cache upgrade && apk --no-cache add git python3 make g++ linux-headers
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        git python3 make g++ ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 RUN git clone --depth 1 https://github.com/decolua/9router.git /app \
     && if [ "${NINEROUTER_REF}" != "master" ]; then \
          git fetch --depth 1 origin "${NINEROUTER_REF}" && git checkout FETCH_HEAD; \
