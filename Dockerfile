@@ -42,8 +42,9 @@ COPY --from=ninerouter_builder /app/.next/static   /opt/9router/.next/static
 COPY --from=ninerouter_builder /app/.next/standalone /opt/9router/
 COPY --from=ninerouter_builder /app/open-sse       /opt/9router/open-sse
 COPY --from=ninerouter_builder /app/src/mitm       /opt/9router/src/mitm
-COPY --from=ninerouter_builder /app/node_modules/node-forge /opt/9router/node_modules/node-forge
-COPY --from=ninerouter_builder /app/node_modules/next /opt/9router/node_modules/next
+# 9Router needs its full dependency tree at runtime so optional database
+# backends such as sqlite drivers remain available inside the standalone build.
+COPY --from=ninerouter_builder /app/node_modules   /opt/9router/node_modules
 
 # ── Non-root user ────────────────────────────────────────────────────────
 RUN useradd -u 10000 -m -d /opt/data hermes
