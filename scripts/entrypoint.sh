@@ -1,6 +1,5 @@
 #!/bin/bash
 set -euo pipefail
-
 HERMES_HOME="${HERMES_HOME:-/opt/data}"
 HERMESFACE_MODE="${HERMESFACE_MODE:-agent}"
 NINEROUTER_DATA_DIR="${NINEROUTER_DATA_DIR:-${HERMES_HOME}/9router-data}"
@@ -11,37 +10,43 @@ SCRIPTS_SRC="/opt/hermes-scripts/scripts"
 INSTALL_DIR="/opt/hermes"
 
 ensure_data_dirs() {
-    mkdir -p "${NINEROUTER_DATA_DIR}/db" \
-             "${NINEROUTER_DATA_DIR}" \
-             "${HERMES_HOME}/scripts" \
-             "${HERMES_HOME}/cron" \
-             "${HERMES_HOME}/sessions" \
-             "${HERMES_HOME}/logs" \
-             "${HERMES_HOME}/hooks" \
-             "${HERMES_HOME}/memories" \
-             "${HERMES_HOME}/skills" \
-             "${HERMES_HOME}/skins" \
-             "${HERMES_HOME}/plans" \
-             "${HERMES_HOME}/workspace" \
-             "${HERMES_HOME}/home"
+  mkdir -p "${NINEROUTER_DATA_DIR}/db" \
+    "${NINEROUTER_DATA_DIR}" \
+    "${HERMES_HOME}/scripts" \
+    "${HERMES_HOME}/cron" \
+    "${HERMES_HOME}/sessions" \
+    "${HERMES_HOME}/logs" \
+    "${HERMES_HOME}/hooks" \
+    "${HERMES_HOME}/memories" \
+    "${HERMES_HOME}/skills" \
+    "${HERMES_HOME}/skins" \
+    "${HERMES_HOME}/plans" \
+    "${HERMES_HOME}/workspace" \
+    "${HERMES_HOME}/home"
+
+  # ★ 修正：確保 hermes 與 9router 均可讀寫 /opt/data
+  chmod -R u+rwX,g+rwX "${HERMES_HOME}" 2>/dev/null || true
+  chmod -R u+rwX,g+rwX "${NINEROUTER_DATA_DIR}" 2>/dev/null || true
 }
 
 if [ "$(id -u)" = "0" ]; then
-    echo "[entrypoint] Running as root, preparing ${HERMES_HOME}..."
-    ensure_data_dirs
-    chown -R hermes:hermes "${HERMES_HOME}"
-    echo "[entrypoint] ${HERMES_HOME} permissions fixed"
-    exec gosu hermes "$0" "$@"
+  echo "[entrypoint] Running as root, preparing ${HERMES_HOME}..."
+  ensure_data_dirs
+  # root 模式：設定 owner 並讓 group 可寫（hermes 與 9router 同 group）
+  chown -R hermes:hermes "${HERMES_HOME}"
+  chmod -R 775 "${HERMES_HOME}"           # ★ 新增：group 寫入位
+  echo "[entrypoint] ${HERMES_HOME} permissions fixed (775 hermes:hermes)"
+  exec gosu hermes "$0" "$@"
 fi
 
 echo "[entrypoint] Waiting for Storage Bucket at ${HERMES_HOME}..."
 for i in $(seq 1 10); do
-    if touch "${HERMES_HOME}/.bucket_check" 2>/dev/null; then
-        rm -f "${HERMES_HOME}/.bucket_check"
-        echo "[entrypoint] Bucket ready after ${i}s"
-        break
-    fi
-    sleep 1
+  if touch "${HERMES_HOME}/.bucket_check" 2>/dev/null; then
+    rm -f "${HERMES_HOME}/.bucket_check"
+    echo "[entrypoint] Bucket ready after ${i}s"
+    break
+  fi
+  sleep 1
 done
 
 ensure_data_dirs
@@ -61,66 +66,60 @@ export NINEROUTER_DEFAULT_MODEL
 export NINEROUTER_API_KEY
 
 if [ -f "${INSTALL_DIR}/.venv/bin/activate" ]; then
-    # shellcheck disable=SC1091
-    source "${INSTALL_DIR}/.venv/bin/activate"
-    echo "[entrypoint] Activated venv: $(which python3)"
+  # shellcheck disable=SC1091
+  source "${INSTALL_DIR}/.venv/bin/activate"
+  echo "[entrypoint] Activated venv: $(which python3)"
 fi
 
 start_ninerouter() {
-    local port="$1"
-    local require_api_key="$2"
-    local public_base_url="${NINEROUTER_PUBLIC_BASE_URL:-http://localhost:${port}}"
-
-    echo "[entrypoint] Starting 9Router on port ${port} (data=${NINEROUTER_DATA_DIR})..."
-    PORT="${port}" \
-    HOSTNAME=0.0.0.0 \
-    NODE_ENV=production \
-    NEXT_PUBLIC_BASE_URL="${public_base_url}" \
-    DATA_DIR="${NINEROUTER_DATA_DIR}" \
-    JWT_SECRET="${NINEROUTER_JWT_SECRET}" \
-    INITIAL_PASSWORD="${NINEROUTER_PASSWORD:-}" \
-    REQUIRE_API_KEY="${require_api_key}" \
-    AUTH_COOKIE_SECURE=false \
-    node /opt/9router/server.js &
-
-    NINEROUTER_PID=$!
-    echo "[entrypoint] 9Router PID: ${NINEROUTER_PID}"
-
-    for i in $(seq 1 30); do
-        if curl -sf "http://localhost:${port}/api/health" >/dev/null 2>&1; then
-            echo "[entrypoint] 9Router ready after ${i}s"
-            return 0
-        fi
-        sleep 1
-    done
-
-    echo "[entrypoint] ERROR: 9Router did not become ready on port ${port}" >&2
-    return 1
+  local port="$1"
+  local require_api_key="$2"
+  local public_base_url="${NINEROUTER_PUBLIC_BASE_URL:-http://localhost:${port}}"
+  echo "[entrypoint] Starting 9Router on port ${port} (data=${NINEROUTER_DATA_DIR})..."
+  PORT="${port}" \
+  HOSTNAME=0.0.0.0 \
+  NODE_ENV=production \
+  NEXT_PUBLIC_BASE_URL="${public_base_url}" \
+  DATA_DIR="${NINEROUTER_DATA_DIR}" \
+  JWT_SECRET="${NINEROUTER_JWT_SECRET}" \
+  INITIAL_PASSWORD="${NINEROUTER_PASSWORD:-}" \
+  REQUIRE_API_KEY="${require_api_key}" \
+  AUTH_COOKIE_SECURE=false \
+  node /opt/9router/server.js &
+  NINEROUTER_PID=$!
+  echo "[entrypoint] 9Router PID: ${NINEROUTER_PID}"
+  for i in $(seq 1 30); do
+    if curl -sf "http://localhost:${port}/api/health" >/dev/null 2>&1; then
+      echo "[entrypoint] 9Router ready after ${i}s"
+      return 0
+    fi
+    sleep 1
+  done
+  echo "[entrypoint] ERROR: 9Router did not become ready on port ${port}" >&2
+  return 1
 }
 
 if [ "${HERMESFACE_MODE}" = "ninerouter-setup" ]; then
-    echo "[entrypoint] HermesFace mode: ninerouter-setup"
-    if [ -z "${NINEROUTER_PASSWORD:-}" ]; then
-        echo "[entrypoint] WARNING: NINEROUTER_PASSWORD is not set; set one before exposing setup mode."
-    fi
-    start_ninerouter 7860 true
-    wait "${NINEROUTER_PID}"
+  echo "[entrypoint] HermesFace mode: ninerouter-setup"
+  if [ -z "${NINEROUTER_PASSWORD:-}" ]; then
+    echo "[entrypoint] WARNING: NINEROUTER_PASSWORD is not set; set one before exposing setup mode."
+  fi
+  start_ninerouter 7860 true
+  wait "${NINEROUTER_PID}"
 elif [ "${HERMESFACE_MODE}" = "agent" ]; then
-    echo "[entrypoint] HermesFace mode: agent"
-    if [ "${NINEROUTER_API_KEY}" = "sk-local" ]; then
-        start_ninerouter 20128 false
-    else
-        start_ninerouter 20128 true
-    fi
-
-    echo "[entrypoint] Build artifacts check:"
-    test -f "${INSTALL_DIR}/run_agent.py" && echo "  OK run_agent.py" || echo "  INFO: run_agent.py not found"
-    test -d "${INSTALL_DIR}/web" && echo "  OK web/ dashboard" || echo "  INFO: web/ not found"
-    command -v hermes >/dev/null 2>&1 && echo "  OK hermes CLI: $(which hermes)" || echo "  INFO: hermes CLI not in PATH"
-
-    echo "[entrypoint] Starting Hermes Agent via bucket-only runner..."
-    exec /usr/bin/python3 -u /opt/hermes-scripts/scripts/run_hermes.py
+  echo "[entrypoint] HermesFace mode: agent"
+  if [ "${NINEROUTER_API_KEY}" = "sk-local" ]; then
+    start_ninerouter 20128 false
+  else
+    start_ninerouter 20128 true
+  fi
+  echo "[entrypoint] Build artifacts check:"
+  test -f "${INSTALL_DIR}/run_agent.py" && echo "  OK run_agent.py" || echo "  INFO: run_agent.py not found"
+  test -d "${INSTALL_DIR}/web" && echo "  OK web/ dashboard" || echo "  INFO: web/ not found"
+  command -v hermes >/dev/null 2>&1 && echo "  OK hermes CLI: $(which hermes)" || echo "  INFO: hermes CLI not in PATH"
+  echo "[entrypoint] Starting Hermes Agent via bucket-only runner..."
+  exec /usr/bin/python3 -u /opt/hermes-scripts/scripts/run_hermes.py
 else
-    echo "[entrypoint] ERROR: unknown HERMESFACE_MODE=${HERMESFACE_MODE}; expected agent or ninerouter-setup" >&2
-    exit 1
+  echo "[entrypoint] ERROR: unknown HERMESFACE_MODE=${HERMESFACE_MODE}; expected agent or ninerouter-setup" >&2
+  exit 1
 fi
