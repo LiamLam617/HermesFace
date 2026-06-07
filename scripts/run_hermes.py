@@ -26,8 +26,8 @@ HERMES_DATA = Path(os.environ.get("HERMES_HOME", "/opt/data"))
 APP_DIR = Path(os.environ.get("HERMES_APP_DIR", "/opt/hermes"))
 AGENT_NAME = os.environ.get("AGENT_NAME", "HermesFace")
 NINEROUTER_BASE_URL = "http://localhost:20128/v1"
-DEFAULT_MODEL = os.environ.get("NINEROUTER_DEFAULT_MODEL", "kr/claude-sonnet-4.5")
-DEFAULT_API_KEY = os.environ.get("NINEROUTER_API_KEY", "sk-local")
+DEFAULT_MODEL = os.environ.get("NINEROUTER_DEFAULT_MODEL", "qd/mmodel")
+DEFAULT_API_KEY = os.environ.get("NINEROUTER_API_KEY", "sk-a22156ef98d8d89a-5yb2bn-cab35976")
 
 _gateway_proc: subprocess.Popen[str] | None = None
 
