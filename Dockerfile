@@ -86,7 +86,7 @@ USER hermes
 
 RUN echo "[build] Installing Python deps..." && START=$(date +%s) \
   && cd /opt/hermes \
-  && uv venv --python 3.13 \
+  && uv venv --python 3.13 --seed \
   && .venv/bin/pip install --no-cache-dir -e ".[all]" \
   && echo "[build] Python deps: $(($(date +%s) - START))s"
 
