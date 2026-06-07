@@ -31,17 +31,25 @@ ensure_data_dirs() {
 if [ "$(id -u)" = "0" ]; then
   echo "[entrypoint] Running as root, preparing ${HERMES_HOME}..."
   ensure_data_dirs
+  # 複製輔助腳本（在 root 階段執行，避免降權後權限不足）
+  echo "[entrypoint] Copying helper scripts into ${HERMES_HOME}/scripts..."
+  cp -r "${SCRIPTS_SRC}/." "${HERMES_HOME}/scripts/"
+  chmod +x "${HERMES_HOME}/scripts/"*.sh "${HERMES_HOME}/scripts/"*.py 2>/dev/null || true
   # 僅在首次啟動或權限標記不存在時執行昂貴的遞迴 chown/chmod
   if [ ! -f "${HERMES_HOME}/.perms_fixed" ]; then
     echo "[entrypoint] First run — fixing ownership and permissions..."
     chown -R hermes:hermes "${HERMES_HOME}"
-    chmod -R 775 "${HERMES_HOME}"
+    chmod -R 777 "${HERMES_HOME}"
     touch "${HERMES_HOME}/.perms_fixed"
-    echo "[entrypoint] Permissions fixed (775 hermes:hermes)"
+    echo "[entrypoint] Permissions fixed (777 hermes:hermes)"
   else
-    # 後續啟動只確保新增目錄的擁有者正確
-    chown hermes:hermes "${HERMES_HOME}"
+    # 後續啟動：確保 /opt/data 整體對 hermes 可讀寫
+    # （Storage Bucket 重新掛載後可能重置權限）
+    chown -R hermes:hermes "${HERMES_HOME}"
+    # 遞迴確保所有目錄可寫（輕量：僅改目錄權限，不動檔案）
+    find "${HERMES_HOME}" -type d ! -perm -777 -exec chmod 777 {} + 2>/dev/null || true
   fi
+
   exec gosu hermes "$0" "$@"
 fi
 
@@ -66,11 +74,7 @@ fi
 
 ensure_data_dirs
 
-# ── 複製輔助腳本（保留錯誤輸出以便診斷） ─────────────────────────────────
-echo "[entrypoint] Copying helper scripts into ${HERMES_HOME}/scripts..."
-cp -r "${SCRIPTS_SRC}/." "${HERMES_HOME}/scripts/"
-
-# ★ 修正 2：chmod 失敗時輸出警告而非靜默忽略
+# ── 輔助腳本已在 root 階段複製，此處僅做 chmod 保險 ─────────────────────
 if ! chmod +x "${HERMES_HOME}/scripts/"*.sh "${HERMES_HOME}/scripts/"*.py 2>/dev/null; then
   echo "[entrypoint] WARNING: Some scripts could not be made executable" >&2
 fi
