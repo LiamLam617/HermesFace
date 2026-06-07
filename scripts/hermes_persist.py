@@ -79,6 +79,28 @@ def _ensure_repo(api: HfApi) -> None:
         api.create_repo(repo_id=Config.DATASET_REPO, repo_type="dataset", private=True)
 
 
+def _streaming_sha256(path: Path, chunk_size: int = 1 << 20) -> str:
+    """Compute SHA-256 without loading the entire file into memory."""
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        while True:
+            chunk = f.read(chunk_size)
+            if not chunk:
+                break
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _safe_extractall(tf: tarfile.TarFile, dest: Path) -> None:
+    """Extract tar with path-traversal protection."""
+    dest = dest.resolve()
+    for member in tf.getmembers():
+        member_path = (dest / member.name).resolve()
+        if not str(member_path).startswith(str(dest)):
+            raise ValueError(f"Path traversal detected: {member.name}")
+    tf.extractall(str(dest))
+
+
 def save() -> int:
     if not Config.HERMES_HOME.exists():
         _log("ERROR", "no_source_dir", path=str(Config.HERMES_HOME))
@@ -96,7 +118,7 @@ def save() -> int:
             tf.add(str(Config.HERMES_HOME), arcname=".", filter=_tar_filter)
 
         size = tar_path.stat().st_size
-        sha256 = hashlib.sha256(tar_path.read_bytes()).hexdigest()
+        sha256 = _streaming_sha256(tar_path)
         _log("INFO", "uploading_backup", file=archive_name, bytes=size, sha256=sha256[:12])
 
         api.upload_file(
@@ -162,7 +184,7 @@ def load() -> int:
             if Config.HERMES_HOME.exists() and any(Config.HERMES_HOME.iterdir()):
                 shutil.copytree(Config.HERMES_HOME, snapshot, dirs_exist_ok=True)
             with tarfile.open(local, "r:*") as tf:
-                tf.extractall(str(Config.HERMES_HOME))
+                _safe_extractall(tf, Config.HERMES_HOME)
             _log("INFO", "restore_completed", file=backup)
             return 0
         except Exception as e:

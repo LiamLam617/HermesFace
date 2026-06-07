@@ -271,7 +271,16 @@ class HermesFullSync:
                 print("[SYNC] Created config.yaml from Hermes template")
             else:
                 # Minimal fallback config
-                import yaml
+                try:
+                    import yaml
+                except ImportError:
+                    # Write minimal YAML manually
+                    config_path.write_text(
+                        f"agent:\n  name: {AGENT_NAME}\nserver:\n  host: 0.0.0.0\n  port: 7860\n",
+                        encoding="utf-8",
+                    )
+                    print(f"[SYNC] Created minimal config.yaml (fallback, no PyYAML)")
+                    return
                 config = {
                     "agent": {"name": AGENT_NAME},
                     "server": {"host": "0.0.0.0", "port": 7860},
@@ -312,7 +321,7 @@ class HermesFullSync:
 
     def _debug_list_files(self):
         try:
-            count = sum(1 for _, _, files in os.walk(HERMES_DATA) for _ in files)
+            count = sum(1 for _root, _dirs, files in os.walk(HERMES_DATA) for _f in files)
             print(f"[SYNC] Local /opt/data: {count} files")
         except Exception as e:
             print(f"[SYNC] listing failed: {e}")
@@ -504,7 +513,10 @@ def main():
                 except subprocess.TimeoutExpired:
                     process.kill()
             print("[SYNC] Final sync...")
-            sync.save_to_repo()
+            try:
+                sync.save_to_repo()
+            except Exception as e:
+                print(f"[SYNC] Final sync failed (non-fatal): {e}")
             sys.exit(0)
 
         signal.signal(signal.SIGINT, handle_signal)

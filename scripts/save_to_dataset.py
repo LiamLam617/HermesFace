@@ -32,11 +32,11 @@ def main() -> None:
 
     api = HfApi(token=token)
 
-    # Sync container logs into state dir for persistence
+    # Sync container logs into a separate backup location (avoid nesting under logs/)
     try:
         sys_log_path = "/opt/data/logs"
-        backup_log_path = os.path.join(state_dir, "logs/sys_logs")
-        if os.path.exists(sys_log_path) and sys_log_path != backup_log_path:
+        backup_log_path = os.path.join(state_dir, "sys_logs_backup")
+        if os.path.exists(sys_log_path) and os.path.abspath(sys_log_path) != os.path.abspath(backup_log_path):
             if os.path.exists(backup_log_path):
                 shutil.rmtree(backup_log_path)
             shutil.copytree(sys_log_path, backup_log_path, ignore_dangling_symlinks=True)

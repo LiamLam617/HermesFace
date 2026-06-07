@@ -16,7 +16,8 @@ RUN git clone --depth 1 https://github.com/decolua/9router.git /app \
        fi
 RUN npm install
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
+# --no-lint: skip TypeScript type-checking to avoid upstream breakage
+RUN npm run build -- --no-lint || npm run build
 
 # ── Stage 2: Build Hermes Agent from source ───────────────────────────────
 FROM ghcr.io/astral-sh/uv:0.11.6-python3.13-trixie AS uv_source
@@ -35,8 +36,9 @@ RUN echo "[build] Installing system deps..." && START=$(date +%s) \
         ripgrep ffmpeg gcc python3-dev libffi-dev procps \
         git ca-certificates curl \
     && rm -rf /var/lib/apt/lists/* \
-    && pip3 install --no-cache-dir --break-system-packages requests pyyaml \
     && echo "[build] System deps: $(($(date +%s) - START))s"
+
+RUN pip3 install --no-cache-dir --break-system-packages requests pyyaml
 
 # ── 複製 9Router 建置產物 ───────────────────────────────────────────────
 COPY --from=ninerouter_builder /app/public         /opt/9router/public
@@ -84,12 +86,9 @@ USER hermes
 
 RUN echo "[build] Installing Python deps..." && START=$(date +%s) \
   && cd /opt/hermes \
-  && uv venv \
-  && uv pip install --no-cache-dir -e ".[all]" \
+  && uv venv --python 3.13 \
+  && .venv/bin/pip install --no-cache-dir -e ".[all]" \
   && echo "[build] Python deps: $(($(date +%s) - START))s"
-
-USER root
-RUN chmod +x /opt/hermes/docker/entrypoint.sh
 
 # ── Prepare runtime dirs ────────────────────────────────────────────────
 RUN mkdir -p /opt/data/cron /opt/data/sessions /opt/data/logs /opt/data/hooks \
@@ -100,17 +99,16 @@ RUN mkdir -p /opt/data/cron /opt/data/sessions /opt/data/logs /opt/data/hooks \
 USER hermes
 
 # ── HermesFace scripts (persistence + entrypoint + DNS + assets) ──────
-ARG CACHE_BUST=2026-04-22-v2
+ARG CACHE_BUST=2026-06-06-v3
 RUN echo "Build: ${CACHE_BUST}"
 COPY --chown=hermes:hermes scripts /opt/hermes-scripts/scripts
 COPY --chown=hermes:hermes assets  /opt/hermes-scripts/assets
 
-RUN find /opt/hermes-scripts/scripts -type f \( -name "*.sh" -o -name "*.py" \) \
-    -exec sed -i 's/\r$//' {} \;
-    
-RUN chmod +x /opt/hermes-scripts/scripts/entrypoint.sh \
-    /opt/hermes-scripts/scripts/dns-resolve.py \
-    /opt/hermes-scripts/scripts/run_hermes.py
+RUN find /opt/hermes-scripts/scripts -type f \( -name "*.sh" -o -name "*.py" -o -name "*.cjs" \) \
+    -exec sed -i 's/\r$//' {} \+ \
+    && chmod +x /opt/hermes-scripts/scripts/entrypoint.sh \
+       /opt/hermes-scripts/scripts/dns-resolve.py \
+       /opt/hermes-scripts/scripts/run_hermes.py
 
 ENV HERMES_HOME=/opt/data
 ENV PATH="/opt/hermes/.venv/bin:$PATH"

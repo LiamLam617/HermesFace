@@ -25,17 +25,23 @@ ensure_data_dirs() {
            "${HERMES_HOME}/plans" \
            "${HERMES_HOME}/workspace" \
            "${HERMES_HOME}/home"
-  chmod -R u+rwX,g+rwX "${HERMES_HOME}" 2>/dev/null || true
-  chmod -R u+rwX,g+rwX "${NINEROUTER_DATA_DIR}" 2>/dev/null || true
 }
 
 # ── Root 降權 ──────────────────────────────────────────────────────────────
 if [ "$(id -u)" = "0" ]; then
   echo "[entrypoint] Running as root, preparing ${HERMES_HOME}..."
   ensure_data_dirs
-  chown -R hermes:hermes "${HERMES_HOME}"
-  chmod -R 775 "${HERMES_HOME}"
-  echo "[entrypoint] ${HERMES_HOME} permissions fixed (775 hermes:hermes)"
+  # 僅在首次啟動或權限標記不存在時執行昂貴的遞迴 chown/chmod
+  if [ ! -f "${HERMES_HOME}/.perms_fixed" ]; then
+    echo "[entrypoint] First run — fixing ownership and permissions..."
+    chown -R hermes:hermes "${HERMES_HOME}"
+    chmod -R 775 "${HERMES_HOME}"
+    touch "${HERMES_HOME}/.perms_fixed"
+    echo "[entrypoint] Permissions fixed (775 hermes:hermes)"
+  else
+    # 後續啟動只確保新增目錄的擁有者正確
+    chown hermes:hermes "${HERMES_HOME}"
+  fi
   exec gosu hermes "$0" "$@"
 fi
 

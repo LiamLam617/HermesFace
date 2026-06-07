@@ -12,6 +12,7 @@ from __future__ import annotations
 import os
 import shutil
 import signal
+import socket
 import subprocess
 import sys
 import threading
@@ -27,6 +28,8 @@ AGENT_NAME = os.environ.get("AGENT_NAME", "HermesFace")
 NINEROUTER_BASE_URL = "http://localhost:20128/v1"
 DEFAULT_MODEL = os.environ.get("NINEROUTER_DEFAULT_MODEL", "kr/claude-sonnet-4.5")
 DEFAULT_API_KEY = os.environ.get("NINEROUTER_API_KEY", "sk-local")
+
+_gateway_proc: subprocess.Popen[str] | None = None
 
 
 class TeeLogger:
@@ -290,6 +293,20 @@ def _start_process(cmd: list[str], label: str, env: dict[str, str], log_path: Pa
         return None
 
 
+def _wait_for_port(host: str, port: int, timeout: int = 15, label: str = "service") -> bool:
+    """Poll until a TCP port is accepting connections or timeout expires."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection((host, port), timeout=1):
+                print(f"[runner] {label} ready on port {port}")
+                return True
+        except (ConnectionRefusedError, OSError):
+            time.sleep(0.5)
+    print(f"[runner] WARNING: {label} did not bind port {port} within {timeout}s")
+    return False
+
+
 def run_hermes() -> subprocess.Popen[str] | None:
     if not APP_DIR.exists():
         print(f"[runner] ERROR: Hermes app directory does not exist: {APP_DIR}")
@@ -320,11 +337,13 @@ def run_hermes() -> subprocess.Popen[str] | None:
     print("[runner] Starting Hermes dashboard on port 7860...")
     dashboard_proc = _start_process(dashboard_cmd, "Dashboard", env, log_dir / "dashboard.log")
 
-    time.sleep(2)
+    # 等待 Dashboard 就緒，而非固定 sleep
+    _wait_for_port("127.0.0.1", 7860, timeout=15, label="Dashboard")
+
     print("[runner] Starting Hermes gateway...")
     gateway_cmd = [hermes_bin, "gateway"]
-    gateway_proc = _start_process(gateway_cmd, "Gateway", env, log_dir / "gateway.log")
-    run_hermes.gateway_proc = gateway_proc  # type: ignore[attr-defined]
+    global _gateway_proc
+    _gateway_proc = _start_process(gateway_cmd, "Gateway", env, log_dir / "gateway.log")
 
     return dashboard_proc
 
@@ -346,13 +365,12 @@ def main() -> int:
 
         def handle_signal(sig: int, _frame: Any) -> None:
             print(f"\n[runner] Signal {sig} received. Shutting down...")
-            gateway_proc = getattr(run_hermes, "gateway_proc", None)
-            if gateway_proc:
-                gateway_proc.terminate()
+            if _gateway_proc:
+                _gateway_proc.terminate()
                 try:
-                    gateway_proc.wait(timeout=5)
+                    _gateway_proc.wait(timeout=5)
                 except subprocess.TimeoutExpired:
-                    gateway_proc.kill()
+                    _gateway_proc.kill()
             process.terminate()
             try:
                 process.wait(timeout=5)
