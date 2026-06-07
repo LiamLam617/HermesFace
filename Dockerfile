@@ -50,6 +50,9 @@ COPY --from=ninerouter_builder /app/src/mitm       /opt/9router/src/mitm
 # backends such as sqlite drivers remain available inside the standalone build.
 COPY --from=ninerouter_builder /app/node_modules   /opt/9router/node_modules
 
+# Rebuild native modules (better-sqlite3) against the runtime Node.js version
+RUN cd /opt/9router && npm rebuild better-sqlite3 2>/dev/null || true
+
 # ── Non-root user ────────────────────────────────────────────────────────
 RUN useradd -u 10000 -m -d /opt/data hermes
 
@@ -99,7 +102,7 @@ RUN mkdir -p /opt/data/cron /opt/data/sessions /opt/data/logs /opt/data/hooks \
 USER hermes
 
 # ── HermesFace scripts (persistence + entrypoint + DNS + assets) ──────
-ARG CACHE_BUST=2026-06-06-v3
+ARG CACHE_BUST=2026-06-07-v1
 RUN echo "Build: ${CACHE_BUST}"
 COPY --chown=hermes:hermes scripts /opt/hermes-scripts/scripts
 COPY --chown=hermes:hermes assets  /opt/hermes-scripts/assets
