@@ -35,20 +35,11 @@ if [ "$(id -u)" = "0" ]; then
   echo "[entrypoint] Copying helper scripts into ${HERMES_HOME}/scripts..."
   cp -r "${SCRIPTS_SRC}/." "${HERMES_HOME}/scripts/"
   chmod +x "${HERMES_HOME}/scripts/"*.sh "${HERMES_HOME}/scripts/"*.py 2>/dev/null || true
-  # 僅在首次啟動或權限標記不存在時執行昂貴的遞迴 chown/chmod
-  if [ ! -f "${HERMES_HOME}/.perms_fixed" ]; then
-    echo "[entrypoint] First run — fixing ownership and permissions..."
-    chown -R hermes:hermes "${HERMES_HOME}"
-    chmod -R 777 "${HERMES_HOME}"
-    touch "${HERMES_HOME}/.perms_fixed"
-    echo "[entrypoint] Permissions fixed (777 hermes:hermes)"
-  else
-    # 後續啟動：確保 /opt/data 整體對 hermes 可讀寫
-    # （Storage Bucket 重新掛載後可能重置權限）
-    chown -R hermes:hermes "${HERMES_HOME}"
-    # 遞迴確保所有目錄可寫（輕量：僅改目錄權限，不動檔案）
-    find "${HERMES_HOME}" -type d ! -perm -777 -exec chmod 777 {} + 2>/dev/null || true
-  fi
+  # 每次啟動都確保 /opt/data 完整可讀寫
+  # （Storage Bucket / FUSE 上 chown 可能不生效，必須靠 chmod 777）
+  echo "[entrypoint] Fixing ownership and permissions on ${HERMES_HOME}..."
+  chown -R hermes:hermes "${HERMES_HOME}" 2>/dev/null || true
+  chmod -R 777 "${HERMES_HOME}"
 
   exec gosu hermes "$0" "$@"
 fi
