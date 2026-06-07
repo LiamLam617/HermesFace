@@ -1,80 +1,106 @@
 #!/bin/bash
 set -euo pipefail
-HERMES_HOME="${HERMES_HOME:-/opt/data}"
-HERMESFACE_MODE="${HERMESFACE_MODE:-agent}"
-NINEROUTER_DATA_DIR="${NINEROUTER_DATA_DIR:-${HERMES_HOME}/9router-data}"
-NINEROUTER_DEFAULT_MODEL="${NINEROUTER_DEFAULT_MODEL:-kr/claude-sonnet-4.5}"
-NINEROUTER_API_KEY="${NINEROUTER_API_KEY:-sk-local}"
-NINEROUTER_JWT_SECRET="${NINEROUTER_JWT_SECRET:-hermesface-change-me}"
+
+# ── 環境變數（加上 export，確保 gosu 後的 child process 繼承） ──────────────
+export HERMES_HOME="${HERMES_HOME:-/opt/data}"
+export HERMESFACE_MODE="${HERMESFACE_MODE:-agent}"
+export NINEROUTER_DATA_DIR="${NINEROUTER_DATA_DIR:-${HERMES_HOME}/9router-data}"
+export NINEROUTER_DEFAULT_MODEL="${NINEROUTER_DEFAULT_MODEL:-kr/claude-sonnet-4.5}"
+export NINEROUTER_API_KEY="${NINEROUTER_API_KEY:-sk-local}"
+export NINEROUTER_JWT_SECRET="${NINEROUTER_JWT_SECRET:-hermesface-change-me}"
 SCRIPTS_SRC="/opt/hermes-scripts/scripts"
 INSTALL_DIR="/opt/hermes"
 
 ensure_data_dirs() {
   mkdir -p "${NINEROUTER_DATA_DIR}/db" \
-    "${NINEROUTER_DATA_DIR}" \
-    "${HERMES_HOME}/scripts" \
-    "${HERMES_HOME}/cron" \
-    "${HERMES_HOME}/sessions" \
-    "${HERMES_HOME}/logs" \
-    "${HERMES_HOME}/hooks" \
-    "${HERMES_HOME}/memories" \
-    "${HERMES_HOME}/skills" \
-    "${HERMES_HOME}/skins" \
-    "${HERMES_HOME}/plans" \
-    "${HERMES_HOME}/workspace" \
-    "${HERMES_HOME}/home"
-
-  # ★ 修正：確保 hermes 與 9router 均可讀寫 /opt/data
+           "${NINEROUTER_DATA_DIR}" \
+           "${HERMES_HOME}/scripts" \
+           "${HERMES_HOME}/cron" \
+           "${HERMES_HOME}/sessions" \
+           "${HERMES_HOME}/logs" \
+           "${HERMES_HOME}/hooks" \
+           "${HERMES_HOME}/memories" \
+           "${HERMES_HOME}/skills" \
+           "${HERMES_HOME}/skins" \
+           "${HERMES_HOME}/plans" \
+           "${HERMES_HOME}/workspace" \
+           "${HERMES_HOME}/home"
   chmod -R u+rwX,g+rwX "${HERMES_HOME}" 2>/dev/null || true
   chmod -R u+rwX,g+rwX "${NINEROUTER_DATA_DIR}" 2>/dev/null || true
 }
 
+# ── Root 降權 ──────────────────────────────────────────────────────────────
 if [ "$(id -u)" = "0" ]; then
   echo "[entrypoint] Running as root, preparing ${HERMES_HOME}..."
   ensure_data_dirs
-  # root 模式：設定 owner 並讓 group 可寫（hermes 與 9router 同 group）
   chown -R hermes:hermes "${HERMES_HOME}"
-  chmod -R 775 "${HERMES_HOME}"           # ★ 新增：group 寫入位
+  chmod -R 775 "${HERMES_HOME}"
   echo "[entrypoint] ${HERMES_HOME} permissions fixed (775 hermes:hermes)"
   exec gosu hermes "$0" "$@"
 fi
 
+# ── 等待 Storage Bucket 就緒（帶失敗退出） ────────────────────────────────
 echo "[entrypoint] Waiting for Storage Bucket at ${HERMES_HOME}..."
+BUCKET_READY=0
 for i in $(seq 1 10); do
   if touch "${HERMES_HOME}/.bucket_check" 2>/dev/null; then
     rm -f "${HERMES_HOME}/.bucket_check"
     echo "[entrypoint] Bucket ready after ${i}s"
+    BUCKET_READY=1
     break
   fi
   sleep 1
 done
 
+# ★ 修正 1：bucket 未就緒時明確報錯退出，不再靜默繼續
+if [ "${BUCKET_READY}" -eq 0 ]; then
+  echo "[entrypoint] ERROR: Storage Bucket at ${HERMES_HOME} not writable after 10s" >&2
+  exit 1
+fi
+
 ensure_data_dirs
 
+# ── 複製輔助腳本（保留錯誤輸出以便診斷） ─────────────────────────────────
 echo "[entrypoint] Copying helper scripts into ${HERMES_HOME}/scripts..."
 cp -r "${SCRIPTS_SRC}/." "${HERMES_HOME}/scripts/"
-chmod +x "${HERMES_HOME}/scripts/"*.sh "${HERMES_HOME}/scripts/"*.py 2>/dev/null || true
 
+# ★ 修正 2：chmod 失敗時輸出警告而非靜默忽略
+if ! chmod +x "${HERMES_HOME}/scripts/"*.sh "${HERMES_HOME}/scripts/"*.py 2>/dev/null; then
+  echo "[entrypoint] WARNING: Some scripts could not be made executable" >&2
+fi
+
+# ── DNS 背景解析（等待結果後再繼續） ─────────────────────────────────────
 echo "[entrypoint] Starting DNS resolution in background..."
 python3 /opt/hermes-scripts/scripts/dns-resolve.py /tmp/dns-resolved.json 2>&1 &
 DNS_PID=$!
 echo "[entrypoint] DNS resolver PID: ${DNS_PID}"
 
-export NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--require /opt/hermes-scripts/scripts/dns-fix.cjs"
-export HERMES_HOME
-export NINEROUTER_DEFAULT_MODEL
-export NINEROUTER_API_KEY
+# ★ 修正 3：等待 dns-resolved.json 生成，最多 15s，避免後續讀取競態
+DNS_WAIT=0
+while [ ! -f /tmp/dns-resolved.json ] && [ "${DNS_WAIT}" -lt 15 ]; do
+  sleep 1
+  DNS_WAIT=$((DNS_WAIT + 1))
+done
+if [ ! -f /tmp/dns-resolved.json ]; then
+  echo "[entrypoint] WARNING: DNS resolution did not complete within 15s, continuing anyway" >&2
+fi
 
+export NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--require /opt/hermes-scripts/scripts/dns-fix.cjs"
+
+# ── 啟用 venv ─────────────────────────────────────────────────────────────
 if [ -f "${INSTALL_DIR}/.venv/bin/activate" ]; then
   # shellcheck disable=SC1091
   source "${INSTALL_DIR}/.venv/bin/activate"
   echo "[entrypoint] Activated venv: $(which python3)"
 fi
 
+# ── 9Router 啟動函式 ───────────────────────────────────────────────────────
 start_ninerouter() {
   local port="$1"
   local require_api_key="$2"
   local public_base_url="${NINEROUTER_PUBLIC_BASE_URL:-http://localhost:${port}}"
+  # ★ 修正 4：明確宣告 NINEROUTER_PID 為全域（避免函式提早 return 時未賦值）
+  NINEROUTER_PID=""
   echo "[entrypoint] Starting 9Router on port ${port} (data=${NINEROUTER_DATA_DIR})..."
   PORT="${port}" \
   HOSTNAME=0.0.0.0 \
@@ -99,12 +125,18 @@ start_ninerouter() {
   return 1
 }
 
+# ── 主邏輯 ────────────────────────────────────────────────────────────────
 if [ "${HERMESFACE_MODE}" = "ninerouter-setup" ]; then
   echo "[entrypoint] HermesFace mode: ninerouter-setup"
   if [ -z "${NINEROUTER_PASSWORD:-}" ]; then
     echo "[entrypoint] WARNING: NINEROUTER_PASSWORD is not set; set one before exposing setup mode."
   fi
+  # ★ 修正 4 續：確認 start_ninerouter 成功後再 wait
   start_ninerouter 7860 true
+  if [ -z "${NINEROUTER_PID}" ]; then
+    echo "[entrypoint] ERROR: 9Router failed to start" >&2
+    exit 1
+  fi
   wait "${NINEROUTER_PID}"
 elif [ "${HERMESFACE_MODE}" = "agent" ]; then
   echo "[entrypoint] HermesFace mode: agent"
@@ -114,9 +146,9 @@ elif [ "${HERMESFACE_MODE}" = "agent" ]; then
     start_ninerouter 20128 true
   fi
   echo "[entrypoint] Build artifacts check:"
-  test -f "${INSTALL_DIR}/run_agent.py" && echo "  OK run_agent.py" || echo "  INFO: run_agent.py not found"
-  test -d "${INSTALL_DIR}/web" && echo "  OK web/ dashboard" || echo "  INFO: web/ not found"
-  command -v hermes >/dev/null 2>&1 && echo "  OK hermes CLI: $(which hermes)" || echo "  INFO: hermes CLI not in PATH"
+  test -f "${INSTALL_DIR}/run_agent.py"  && echo "  OK  run_agent.py"       || echo "  INFO: run_agent.py not found"
+  test -d "${INSTALL_DIR}/web"           && echo "  OK  web/ dashboard"      || echo "  INFO: web/ not found"
+  command -v hermes >/dev/null 2>&1      && echo "  OK  hermes CLI: $(which hermes)" || echo "  INFO: hermes CLI not in PATH"
   echo "[entrypoint] Starting Hermes Agent via bucket-only runner..."
   exec /usr/bin/python3 -u /opt/hermes-scripts/scripts/run_hermes.py
 else
