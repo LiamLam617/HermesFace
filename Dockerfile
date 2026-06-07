@@ -29,14 +29,22 @@ ENV PYTHONUNBUFFERED=1
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/hermes/.playwright
 
 # ── System dependencies ───────────────────────────────────────────────────
+# NOTE: Do NOT install apt's nodejs/npm — we copy Node 22 from the builder stage below
 RUN echo "[build] Installing system deps..." && START=$(date +%s) \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
-        build-essential nodejs npm python3 python3-pip python3-venv \
+        build-essential python3 python3-pip python3-venv \
         ripgrep ffmpeg gcc python3-dev libffi-dev procps \
         git ca-certificates curl \
     && rm -rf /var/lib/apt/lists/* \
     && echo "[build] System deps: $(($(date +%s) - START))s"
+
+# ── Use Node 22 from builder stage (matches 9Router build environment) ──
+COPY --from=ninerouter_builder /usr/local/bin/node /usr/local/bin/node
+COPY --from=ninerouter_builder /usr/local/lib/node_modules /usr/local/lib/node_modules
+RUN ln -sf /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+    && ln -sf /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \
+    && node --version && npm --version
 
 RUN pip3 install --no-cache-dir --break-system-packages requests pyyaml
 
@@ -50,8 +58,7 @@ COPY --from=ninerouter_builder /app/src/mitm       /opt/9router/src/mitm
 # backends such as sqlite drivers remain available inside the standalone build.
 COPY --from=ninerouter_builder /app/node_modules   /opt/9router/node_modules
 
-# Rebuild native modules (better-sqlite3) against the runtime Node.js version
-RUN cd /opt/9router && npm rebuild better-sqlite3 2>/dev/null || true
+# better-sqlite3 now matches runtime Node version — no rebuild needed
 
 # ── Non-root user ────────────────────────────────────────────────────────
 RUN useradd -u 10000 -m -d /opt/data hermes
