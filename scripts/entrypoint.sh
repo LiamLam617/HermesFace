@@ -1,5 +1,6 @@
 #!/bin/bash
 set -euo pipefail
+umask 000
 
 # ── 環境變數（加上 export，確保 gosu 後的 child process 繼承） ──────────────
 export HERMES_HOME="${HERMES_HOME:-/opt/data}"
@@ -35,11 +36,11 @@ if [ "$(id -u)" = "0" ]; then
   echo "[entrypoint] Copying helper scripts into ${HERMES_HOME}/scripts..."
   cp -r "${SCRIPTS_SRC}/." "${HERMES_HOME}/scripts/"
   chmod +x "${HERMES_HOME}/scripts/"*.sh "${HERMES_HOME}/scripts/"*.py 2>/dev/null || true
-  # 每次啟動都確保 /opt/data 完整可讀寫
-  # （Storage Bucket / FUSE 上 chown 可能不生效，必須靠 chmod 777）
-  echo "[entrypoint] Fixing ownership and permissions on ${HERMES_HOME}..."
+  # 確保 /opt/data 完整可讀寫（僅修正權限不足的文件，避免全量遞迴）
+  echo "[entrypoint] Fixing permissions on ${HERMES_HOME}..."
   chown -R hermes:hermes "${HERMES_HOME}" 2>/dev/null || true
-  chmod -R 777 "${HERMES_HOME}"
+  # 只 chmod 缺少 write 權限的檔案/目錄（比 chmod -R 快得多）
+  find "${HERMES_HOME}" ! -perm -002 -exec chmod 777 {} + 2>/dev/null || true
 
   exec gosu hermes "$0" "$@"
 fi
